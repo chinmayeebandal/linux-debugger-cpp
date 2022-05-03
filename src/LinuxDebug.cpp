@@ -9,6 +9,40 @@
 
 #include "linuxdebug.hpp"
 
+/* Runs the debugger process */
+void linuxdebug::Debugger::run() {
+    int waitStatus;
+    auto options = 0;
+
+    /* When the traced/child process is launched, it will be sent a SIGTRAP signal, which is a trace or breakpoint trap. We can wait until this signal is sent using the waitpid function. */
+    waitpid(linuxdebug::Debugger::m_pid, &waitStatus, options); //wait until child process pid 0 has finished launching
+
+    // Listen for user input from linenoise until we hit EOF / Ctrl + D.
+    char *line = nullptr;
+    while((line = linenoise("linuxdebugger> ")) != nullptr) {
+        handle_command(line); //TODO: handle input
+        linenoiseHistoryAdd(line);
+        linenoiseFree(line);
+    }
+}
+
+/** Executes the debugger on the program given as an input. Prints error when ptrace errors out. **/
+void execute_debugger_program(const std::string& program_name) {
+    /*
+     * ptrace allows to observe and control the execution of another process by reading 
+     *registers, reading memory, single stepping and more 
+     * PTRACE_TRACEME: indicates that this process should allow its parent to trace it
+    */
+    long ptrace_val = ptrace(PTRACE_TRACEME, 0, nullptr, nullptr); // tracing child process pid 0
+    if(ptrace_val < 0) {
+        std::cerr << "Error in ptrace" << std::endl;
+    }
+
+    execl(program_name.c_str(), program_name.c_str(), nullptr); //execute program, pass name as CLI arg, terminate list with nullptr
+}
+
+
+
 int main(int argc, char* argv[]) {
     std::cout << "Hello world" << std::endl;
 
@@ -20,22 +54,15 @@ int main(int argc, char* argv[]) {
 
     auto program = argv[1]; //second arg is command name
 
-    /** LAUNCHING THE EXECUTABLE using fork/exec **/
+    /** 1. LAUNCHING THE EXECUTABLE using fork/exec **/
     auto pid = fork(); //split program into two processes p1 p2
     if(pid == 0) {
         //In child process
         std::cout << "In child process---" << std::endl;
-
-        /*
-         * ptrace allows us to observe and control the execution of another process by reading * registers, reading memory, single stepping and more
-         * PTRACE_TRACEME: indicates that this process should allow its parent to trace it
-        */
-        ptrace(PT_TRACE_ME, 0, nullptr, nullptr); // tracing child process pid 0
-
-        execl(program, program, nullptr); //execute program, pass name as CLI arg, terminate list with nullptr
+        execute_debugger_program(program);
     }
 
-    /** ADD DEBUGGER LOOP **/
+    /** 2. ADD DEBUGGER LOOP **/
     else if(pid >= 1) {
         //In parent process
         std::cout << "In parent process---" << std::endl;
@@ -43,9 +70,6 @@ int main(int argc, char* argv[]) {
 
         linuxdebug::Debugger debug{program, pid};
         debug.run();
-    }
-    else {
-
     }
 
     return 1; 
