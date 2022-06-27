@@ -5,9 +5,62 @@
 #include <sstream>
 #include <iostream>
 
-#include "../ext-dependencies/linenoise/linenoise.h"
+#include "linenoise.h"
 
 #include "linuxdebug.hpp"
+
+
+/* Helper Functions */
+
+//Split string on delimiter
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> out{};
+    std::stringstream ss {s};
+    std::string item;
+
+    while(std::getline(ss, item, delimiter)) {
+        out.push_back(item);
+    }
+
+    return out;
+}
+
+//Returns bool val if "string of" is a prefix of "string s"
+bool is_prefix(const std::string& s, const std::string& of) {
+    if(s.size() != of.size())
+        return false;
+
+    return std::equal(s.begin(), s.end(), of.begin());
+}
+
+/* End of Helper Functions */
+
+
+// Continues the program from the "continue" command
+void linuxdebug::Debugger::continue_execution() {
+    //use ptrace to continue execution of the process
+    ptrace(PTRACE_CONT, m_pid, nullptr, nullptr);
+
+    //wait on pid until signal is received
+    int wait_status;
+    auto options = 0;
+    waitpid(m_pid, &wait_status, options);
+}
+
+//Handles the debug commands like "continue", "break"
+void linuxdebug::Debugger::handle_command(const std::string& line) {
+    auto args = split(line, ' ');
+    auto command = args[0];
+
+    //handles the continue program on encountering "continue", "cont", or "c"
+    if(is_prefix(command, "continue")) {
+        continue_execution();
+    }
+    else {
+        std::cerr << "Unknown command" << std::endl;
+    }
+}
+
 
 /* Runs the debugger process */
 void linuxdebug::Debugger::run() {
@@ -19,8 +72,8 @@ void linuxdebug::Debugger::run() {
 
     // Listen for user input from linenoise until we hit EOF / Ctrl + D.
     char *line = nullptr;
-    while((line = linenoise("linuxdebugger> ")) != nullptr) {
-        handle_command(line); //TODO: handle input
+    while((line = linenoise("linuxdebugger > ")) != nullptr) {
+        handle_command(line); //handle input commands
         linenoiseHistoryAdd(line);
         linenoiseFree(line);
     }
