@@ -14,10 +14,10 @@ linenoise.o: ext/linenoise/linenoise.c
 	gcc -Wall -W -Os -g -c ext/linenoise/linenoise.c
 
 
-all: debugger
+all: linuxdebugger
 
-run: debugger
-	./debugger
+run: linuxdebugger
+	./linuxdebugger
 
 clean:
-	rm -rf debugger *.o
+	rm -rf linuxdebugger *.o
